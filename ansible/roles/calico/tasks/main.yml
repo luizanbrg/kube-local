@@ -1,0 +1,138 @@
+---
+- name: Create Calico manifest directory
+  ansible.builtin.file:
+    path: "{{ calico_remote_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy Calico CRDs to control plane
+  ansible.builtin.copy:
+    src: "{{ calico_manifest_dir }}/v3_projectcalico_org-v1beta1.yaml"
+    dest: "{{ calico_remote_dir }}/calico-crds.yaml"
+    mode: "0644"
+
+- name: Copy Tigera Operator manifest
+  ansible.builtin.copy:
+    src: "{{ calico_manifest_dir }}/tigera-operator-normalized.yaml"
+    dest: "{{ calico_remote_dir }}/tigera-operator.yaml"
+    mode: "0644"
+
+- name: Generate Calico custom resources
+  ansible.builtin.template:
+    src: custom-resources.yaml.j2
+    dest: "{{ calico_remote_dir }}/custom-resources.yaml"
+    mode: "0644"
+
+- name: Install Calico CRDs
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --server-side
+      - --force-conflicts
+      - -f
+      - "{{ calico_remote_dir }}/calico-crds.yaml"
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_crds
+  changed_when: >
+    'created' in calico_crds.stdout or
+    'configured' in calico_crds.stdout
+
+- name: Install Tigera Operator
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -f
+      - "{{ calico_remote_dir }}/tigera-operator.yaml"
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: tigera_operator
+  changed_when: >
+    'created' in tigera_operator.stdout or
+    'configured' in tigera_operator.stdout
+
+- name: Wait for Tigera Operator
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - rollout
+      - status
+      - deployment/tigera-operator
+      - -n
+      - tigera-operator
+      - --timeout=300s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+
+- name: Install Calico custom resources
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -f
+      - "{{ calico_remote_dir }}/custom-resources.yaml"
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_install
+  changed_when: >
+    'created' in calico_install.stdout or
+    'configured' in calico_install.stdout
+
+- name: Wait for Calico TigeraStatus resource to exist
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - tigerastatus/calico
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_status
+  retries: 30
+  delay: 10
+  until: calico_status.rc == 0
+  changed_when: false
+
+- name: Wait for Calico installation to become available
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - wait
+      - --for=condition=Available=True
+      - tigerastatus/calico
+      - --timeout=600s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+
+- name: Wait for all Kubernetes nodes to become Ready
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - wait
+      - --for=condition=Ready
+      - nodes
+      - --all
+      - --timeout=300s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+
+- name: Display Kubernetes nodes
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - nodes
+      - -o
+      - wide
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: cluster_nodes
+  changed_when: false
+
+- name: Show cluster status
+  ansible.builtin.debug:
+    var: cluster_nodes.stdout_lines

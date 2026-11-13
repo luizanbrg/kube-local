@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-worker-1
+  namespace: networking-test
+spec:
+  nodeName: worker-1
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-worker-2
+  namespace: networking-test
+spec:
+  nodeName: worker-2
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80

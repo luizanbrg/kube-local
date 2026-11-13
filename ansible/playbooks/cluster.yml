@@ -1,0 +1,16 @@
+---
+- name: Initialize Kubernetes control plane
+  hosts: control_plane
+  become: true
+  gather_facts: true
+
+  roles:
+    - control_plane
+
+- name: Join Kubernetes worker nodes
+  hosts: workers
+  become: true
+  gather_facts: true
+
+  roles:
+    - workers

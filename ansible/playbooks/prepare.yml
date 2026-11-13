@@ -1,0 +1,9 @@
+---
+- name: Prepare Kubernetes nodes
+  hosts: all
+  become: true
+
+  roles:
+    - common
+    - containerd
+    - kubernetes

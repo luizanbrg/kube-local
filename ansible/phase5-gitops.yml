@@ -1,0 +1,8 @@
+---
+- name: Phase 5 - Bootstrap GitOps with Argo CD
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - argocd

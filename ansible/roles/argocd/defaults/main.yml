@@ -1,0 +1,4 @@
+---
+argocd_namespace: argocd
+argocd_manifest: "{{ playbook_dir }}/files/argocd/install.yaml"
+argocd_root_application: "{{ playbook_dir }}/files/argocd/root-app.yaml"

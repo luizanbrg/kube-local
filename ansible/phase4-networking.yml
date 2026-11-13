@@ -1,0 +1,8 @@
+---
+- name: Phase 4 - Install Kubernetes networking with Calico
+  hosts: control-plane
+  become: true
+  gather_facts: true
+
+  roles:
+    - calico

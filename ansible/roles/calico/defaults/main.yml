@@ -1,0 +1,19 @@
+---
+# Calico version
+calico_version: "v3.33.0"
+
+# Kubernetes Pod network
+calico_pod_cidr: "10.244.0.0/16"
+
+# Networking configuration
+calico_encapsulation: "VXLAN"
+calico_bgp: "Disabled"
+
+# Where the Kubernetes administrator kubeconfig lives
+calico_kubeconfig: "/etc/kubernetes/admin.conf"
+
+# Temporary directory on the control-plane node
+calico_remote_dir: "/tmp/calico"
+
+# Local manifest directory, relative to the playbook
+calico_manifest_dir: "{{ playbook_dir }}/files/calico"

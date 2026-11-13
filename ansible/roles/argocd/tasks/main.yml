@@ -1,0 +1,112 @@
+---
+- name: Verify Kubernetes API connectivity
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - --raw=/readyz
+  register: kubernetes_ready
+  changed_when: false
+
+- name: Create Argo CD namespace
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - create
+      - namespace
+      - "{{ argocd_namespace }}"
+      - --dry-run=client
+      - -o
+      - yaml
+  register: argocd_namespace_manifest
+  changed_when: false
+
+- name: Apply Argo CD namespace
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -f
+      - -
+  args:
+    stdin: "{{ argocd_namespace_manifest.stdout }}"
+  register: namespace_apply
+  changed_when: "'created' in namespace_apply.stdout or 'configured' in namespace_apply.stdout"
+
+- name: Install Argo CD
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --server-side
+      - --field-manager=ansible-argocd-bootstrap
+      - -n
+      - "{{ argocd_namespace }}"
+      - -f
+      - "{{ argocd_manifest }}"
+  register: argocd_install
+  changed_when: >
+    'created' in argocd_install.stdout or
+    'configured' in argocd_install.stdout or
+    'serverside-applied' in argocd_install.stdout
+
+- name: Wait for Argo CD CRDs to become established
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - wait
+      - --for=condition=Established
+      - --timeout=180s
+      - crd/applications.argoproj.io
+      - crd/appprojects.argoproj.io
+  changed_when: false
+
+- name: Wait for Argo CD server
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - rollout
+      - status
+      - deployment/argocd-server
+      - -n
+      - "{{ argocd_namespace }}"
+      - --timeout=300s
+  changed_when: false
+
+- name: Wait for Argo CD repository server
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - rollout
+      - status
+      - deployment/argocd-repo-server
+      - -n
+      - "{{ argocd_namespace }}"
+      - --timeout=300s
+  changed_when: false
+
+- name: Wait for Argo CD application controller
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - rollout
+      - status
+      - statefulset/argocd-application-controller
+      - -n
+      - "{{ argocd_namespace }}"
+      - --timeout=300s
+  changed_when: false
+
+- name: Bootstrap root GitOps Application
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -n
+      - "{{ argocd_namespace }}"
+      - -f
+      - "{{ argocd_root_application }}"
+  register: root_application_apply
+  changed_when: >
+    'created' in root_application_apply.stdout or
+    'configured' in root_application_apply.stdout

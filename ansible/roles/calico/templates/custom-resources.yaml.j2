@@ -1,0 +1,33 @@
+---
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  variant: Calico
+
+  calicoNetwork:
+    bgp: {{ calico_bgp }}
+
+    ipPools:
+      - name: default-ipv4-ippool
+        cidr: "{{ calico_pod_cidr }}"
+        encapsulation: {{ calico_encapsulation }}
+        natOutgoing: Enabled
+        nodeSelector: all()
+
+        allowedUses:
+          - Workload
+          - Tunnel
+        assignmentMode: Automatic
+        blockSize: 26
+        disableBGPExport: false
+        disableNewAllocations: false
+
+---
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}
+

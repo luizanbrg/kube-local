@@ -1,0 +1,14 @@
+---
+- name: Check whether worker already joined Kubernetes
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_kubelet_config
+
+- name: Join worker to Kubernetes cluster
+  ansible.builtin.command:
+    cmd: >-
+      {{ hostvars[groups['control_plane'][0]].k8s_join_command }}
+      --cri-socket {{ k8s_cri_socket }}
+      --node-name {{ inventory_hostname }}
+  when: not worker_kubelet_config.stat.exists
+  no_log: true

@@ -1,0 +1,16 @@
+---
+# Kubernetes API endpoint
+k8s_control_plane_ip: "192.168.252.2"
+k8s_api_port: 6443
+
+# Network allocated to Kubernetes Pods
+k8s_pod_network_cidr: "10.244.0.0/16"
+
+# Network allocated to Kubernetes Services
+k8s_service_cidr: "10.96.0.0/12"
+
+# Container runtime socket
+k8s_cri_socket: "unix:///run/containerd/containerd.sock"
+
+# User managing the cluster
+k8s_admin_user: "ubuntu"

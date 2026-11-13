@@ -1,0 +1,54 @@
+---
+- name: Initialize Kubernetes control plane
+  ansible.builtin.command:
+    argv:
+      - kubeadm
+      - init
+      - "--apiserver-advertise-address={{ k8s_control_plane_ip }}"
+      - "--pod-network-cidr={{ k8s_pod_network_cidr }}"
+      - "--service-cidr={{ k8s_service_cidr }}"
+      - "--cri-socket={{ k8s_cri_socket }}"
+      - "--node-name={{ inventory_hostname }}"
+  args:
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init
+
+- name: Create kubectl configuration directory
+  ansible.builtin.file:
+    path: "/home/{{ k8s_admin_user }}/.kube"
+    state: directory
+    owner: "{{ k8s_admin_user }}"
+    group: "{{ k8s_admin_user }}"
+    mode: "0700"
+
+- name: Copy Kubernetes admin configuration
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ k8s_admin_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ k8s_admin_user }}"
+    group: "{{ k8s_admin_user }}"
+    mode: "0600"
+
+- name: Wait for Kubernetes API server
+  ansible.builtin.wait_for:
+    host: "{{ k8s_control_plane_ip }}"
+    port: "{{ k8s_api_port }}"
+    delay: 5
+    timeout: 180
+
+- name: Generate Kubernetes worker join command
+  ansible.builtin.command:
+    argv:
+      - kubeadm
+      - token
+      - create
+      - --print-join-command
+  register: kubeadm_join_command
+  changed_when: true
+  no_log: true
+
+- name: Store worker join command
+  ansible.builtin.set_fact:
+    k8s_join_command: "{{ kubeadm_join_command.stdout }}"
+  no_log: true
