@@ -10,8 +10,8 @@ spec:
 
   source:
     repoURL: https://github.com/luizanbrg/kube-local.git
-    targetRevision: main
-    path: gitops/workloads/demo
+    targetRevision: dev
+    path: infrastructure/gitops/workloads/demo
 
   destination:
     server: https://kubernetes.default.svc

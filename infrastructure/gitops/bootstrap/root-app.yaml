@@ -8,8 +8,8 @@ spec:
 
   source:
     repoURL: https://github.com/luizanbrg/kube-local.git
-    targetRevision: main
-    path: gitops/applications
+    targetRevision: dev
+    path: infrastructure/gitops/applications
 
   destination:
     server: https://kubernetes.default.svc
