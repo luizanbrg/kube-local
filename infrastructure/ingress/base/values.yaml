@@ -1,0 +1,59 @@
+# Chart traefik/traefik 42.1.3 (Kubernetes >= 1.30).
+deployment:
+  replicas: 1
+
+ingressClass:
+  enabled: true
+  name: traefik
+  isDefaultClass: false
+
+providers:
+  kubernetesIngress:
+    enabled: true
+    ingressClass: traefik
+    publishedService:
+      enabled: false
+  kubernetesCRD:
+    enabled: false
+  kubernetesGateway:
+    enabled: false
+
+service:
+  spec:
+    type: NodePort
+    # Le pod peut tourner sur un worker : kube-1 doit pouvoir le joindre.
+    externalTrafficPolicy: Cluster
+
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    nodePort: 30080
+    expose:
+      default: true
+  websecure:
+    port: 8443
+    exposedPort: 443
+    nodePort: 30443
+    expose:
+      default: true
+  traefik:
+    expose:
+      default: false
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+log:
+  level: INFO
+accessLog:
+  enabled: true

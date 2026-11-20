@@ -1,0 +1,61 @@
+# LOCAL UNIQUEMENT : certificat auto-signe, jamais un certificat Let's Encrypt.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: local-selfsigned
+  namespace: ingress-test
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress-test-local-tls
+  namespace: ingress-test
+spec:
+  secretName: ingress-test-local-tls
+  dnsNames:
+    - test.127.0.0.1.sslip.io
+    - app.127.0.0.1.sslip.io
+  issuerRef:
+    name: local-selfsigned
+    kind: Issuer
+  privateKey:
+    rotationPolicy: Always
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test-local-https
+  namespace: ingress-test
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - test.127.0.0.1.sslip.io
+        - app.127.0.0.1.sslip.io
+      secretName: ingress-test-local-tls
+  rules:
+    - host: test.127.0.0.1.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ingress-test
+                port:
+                  number: 80
+    - host: app.127.0.0.1.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ingress-test
+                port:
+                  number: 80

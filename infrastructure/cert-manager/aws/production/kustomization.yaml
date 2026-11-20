@@ -1,0 +1,15 @@
+# Utiliser seulement apres validation du parcours staging.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../staging
+patches:
+  - target:
+      group: cert-manager.io
+      version: v1
+      kind: Certificate
+      name: ingress-test-tls
+    patch: |-
+      - op: replace
+        path: /spec/issuerRef/name
+        value: letsencrypt-production

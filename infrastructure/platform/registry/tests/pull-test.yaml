@@ -1,0 +1,30 @@
+# Pod qui tire une image PRIVÉE de notre GHCR.
+# - sans le Secret "regcred" dans le namespace : ErrImagePull / ImagePullBackOff (401)
+# - avec "regcred" : le pod démarre et affiche "pull OK"
+# Conforme aux admission policies du namespace kubequest-app.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: registry-pull-test
+  namespace: kubequest-app
+  labels:
+    app.kubernetes.io/name: registry-pull-test
+    app.kubernetes.io/instance: registry-pull-test
+    app.kubernetes.io/part-of: kubequest
+spec:
+  restartPolicy: Never
+  imagePullSecrets:
+    - name: regcred
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+  containers:
+    - name: test
+      image: ghcr.io/epitechmscpropromo2027/t-clo-901-nce-9-1-kube-4/test:1
+      imagePullPolicy: Always
+      command: ["sh", "-c", "echo pull OK"]
+      securityContext:
+        allowPrivilegeEscalation: false
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { cpu: 50m, memory: 32Mi }

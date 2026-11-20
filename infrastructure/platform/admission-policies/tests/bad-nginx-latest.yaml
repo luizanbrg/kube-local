@@ -1,0 +1,11 @@
+# Pod qui viole toutes les règles possibles (root implicite, pas de resources,
+# image Docker Hub en latest, aucun label) : doit être REFUSÉ. Preuve pour la soutenance.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: policy-test-nginx
+  namespace: kubequest-app
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest

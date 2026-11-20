@@ -1,0 +1,57 @@
+# Règle 4 : labels recommandés Kubernetes obligatoires sur les workloads et les pods.
+# Pour un CronJob, les Jobs créés prennent les labels de spec.jobTemplate.metadata.labels :
+# il faut donc aussi les y mettre.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: kubequest-labels
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs", "cronjobs"]
+  variables:
+    - name: required
+      expression: "['app.kubernetes.io/name', 'app.kubernetes.io/instance', 'app.kubernetes.io/part-of']"
+    - name: labels
+      expression: "has(object.metadata.labels) ? object.metadata.labels : {}"
+    - name: missing
+      expression: "variables.required.filter(l, !(l in variables.labels))"
+  validations:
+    - expression: "size(variables.missing) == 0"
+      messageExpression: >-
+        'Labels obligatoires manquants sur ' + object.kind + ' ' + object.metadata.name + ' : ' +
+        variables.missing.join(', ')
+    - expression: >-
+        !('app.kubernetes.io/part-of' in variables.labels) ||
+        variables.labels['app.kubernetes.io/part-of'] == 'kubequest'
+      message: "Le label app.kubernetes.io/part-of doit valoir 'kubequest'."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: kubequest-labels
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  policyName: kubequest-labels
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kubequest-app

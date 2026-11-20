@@ -46,3 +46,8 @@ admin.conf
 
 
 .github/workflows/mirror.yml
+
+# ==========================================
+# Helm: downloaded subcharts (Chart.lock is committed)
+# ==========================================
+application/helm/*/charts/

@@ -1,0 +1,92 @@
+# Règle 1 : pas de root, pas de conteneur privilégié, pas d'élévation de privilèges.
+# S'applique à tous les conteneurs (initContainers compris).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: kubequest-non-root
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs", "cronjobs"]
+  variables:
+    # Le "spec" du pod, où qu'il soit rangé selon le type d'objet.
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        (object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec)
+    - name: containers
+      expression: >-
+        variables.podSpec.containers +
+        (has(variables.podSpec.initContainers) ? variables.podSpec.initContainers : [])
+    - name: podNonRoot
+      expression: >-
+        has(variables.podSpec.securityContext) &&
+        has(variables.podSpec.securityContext.runAsNonRoot) &&
+        variables.podSpec.securityContext.runAsNonRoot == true
+    - name: podRunsAsRoot
+      expression: >-
+        has(variables.podSpec.securityContext) &&
+        has(variables.podSpec.securityContext.runAsUser) &&
+        variables.podSpec.securityContext.runAsUser == 0
+  validations:
+    # runAsNonRoot: true au niveau du conteneur, ou hérité du pod (sans être remis à false).
+    - expression: >-
+        variables.containers.all(c,
+          has(c.securityContext) && has(c.securityContext.runAsNonRoot)
+            ? c.securityContext.runAsNonRoot == true
+            : variables.podNonRoot)
+      messageExpression: >-
+        'runAsNonRoot: true est obligatoire (pod ou conteneur). Conteneurs en faute : ' +
+        variables.containers.filter(c,
+          !(has(c.securityContext) && has(c.securityContext.runAsNonRoot)
+            ? c.securityContext.runAsNonRoot == true
+            : variables.podNonRoot)).map(c, c.name).join(', ')
+    # Interdit de forcer l'UID 0 (root).
+    - expression: >-
+        !variables.podRunsAsRoot &&
+        variables.containers.all(c,
+          !(has(c.securityContext) && has(c.securityContext.runAsUser) && c.securityContext.runAsUser == 0))
+      message: "runAsUser: 0 (root) est interdit."
+    - expression: >-
+        variables.containers.all(c,
+          !(has(c.securityContext) && has(c.securityContext.privileged) && c.securityContext.privileged == true))
+      message: "Les conteneurs privileged sont interdits."
+    - expression: >-
+        variables.containers.all(c,
+          has(c.securityContext) && has(c.securityContext.allowPrivilegeEscalation) &&
+          c.securityContext.allowPrivilegeEscalation == false)
+      messageExpression: >-
+        'allowPrivilegeEscalation: false est obligatoire sur chaque conteneur. Conteneurs en faute : ' +
+        variables.containers.filter(c,
+          !(has(c.securityContext) && has(c.securityContext.allowPrivilegeEscalation) &&
+            c.securityContext.allowPrivilegeEscalation == false)).map(c, c.name).join(', ')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: kubequest-non-root
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  policyName: kubequest-non-root
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kubequest-app

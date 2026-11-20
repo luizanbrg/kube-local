@@ -1,0 +1,11 @@
+{
+  "realm": "kubequest",
+  "enabled": true,
+  "displayName": "KubeQuest",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "groups": [
+    { "name": "kubequest-admins" },
+    { "name": "kubequest-readers" }
+  ]
+}

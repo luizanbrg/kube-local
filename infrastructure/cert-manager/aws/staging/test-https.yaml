@@ -1,0 +1,41 @@
+# Appliquer apres le test HTTP de whoami et la creation du ClusterIssuer.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress-test-tls
+  namespace: ingress-test
+spec:
+  secretName: ingress-test-tls
+  dnsNames:
+    - test.3.120.212.20.sslip.io
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test-https
+  namespace: ingress-test
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - test.3.120.212.20.sslip.io
+      secretName: ingress-test-tls
+  rules:
+    - host: test.3.120.212.20.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ingress-test
+                port:
+                  number: 80

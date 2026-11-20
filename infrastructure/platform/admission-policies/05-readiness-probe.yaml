@@ -1,0 +1,40 @@
+# Règle 5 : readinessProbe obligatoire sur les conteneurs des Deployments et StatefulSets.
+# Volontairement PAS sur les Pods/Jobs/CronJobs : un job de backup n'a pas de trafic à recevoir.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: kubequest-readiness-probe
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets"]
+  variables:
+    - name: missing
+      expression: "object.spec.template.spec.containers.filter(c, !has(c.readinessProbe))"
+  validations:
+    - expression: "size(variables.missing) == 0"
+      messageExpression: >-
+        'readinessProbe obligatoire sur chaque conteneur de ' + object.kind + ' ' + object.metadata.name +
+        '. Conteneurs en faute : ' + variables.missing.map(c, c.name).join(', ')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: kubequest-readiness-probe
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  policyName: kubequest-readiness-probe
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kubequest-app

@@ -1,0 +1,252 @@
+# Default values for kubequest-app.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
+# At least 2 replicas: the app keeps serving if one pod is down (P2-08)
+replicaCount: 2
+
+# How a new version replaces the old one (RollingUpdate = pod by pod, no downtime).
+rollingUpdate:
+  # Create 1 extra pod with the new version first...
+  maxSurge: 1
+  # ...and never remove an old pod before the new one is ready: the old version keeps serving.
+  maxUnavailable: 0
+# A new pod must stay ready for 10 s before Kubernetes trusts it and removes an old one.
+minReadySeconds: 10
+# If the new version is still not ready after 3 min, the rollout is marked as failed
+# (old pods keep serving; visible with "kubectl rollout status").
+progressDeadlineSeconds: 180
+
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+image:
+  repository: kubequest-app
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "0.1.0"
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The app never calls the Kubernetes API: no token mounted in the pods
+  automount: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+podLabels: {}
+
+# Required by admission policy 01-non-root (P4).
+# The image runs Apache as www-data: uid/gid 33 must be numeric so Kubernetes can check it is not root.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33
+  runAsGroup: 33
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+service:
+  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+  type: ClusterIP
+  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+  # Port exposed by the Service inside the cluster (used by the Ingress)
+  port: 80
+  # Port Apache listens on inside the container (non-root, so >= 1024)
+containerPort: 8080
+
+# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+# -- Expose the service via gateway-api HTTPRoute
+# Requires Gateway API resources and suitable controller installed within the cluster
+# (see: https://gateway-api.sigs.k8s.io/guides/)
+httpRoute:
+  # HTTPRoute enabled.
+  enabled: false
+  # HTTPRoute annotations.
+  annotations: {}
+  # Which Gateways this Route is attached to.
+  parentRefs:
+  - name: gateway
+    sectionName: http
+    # namespace: default
+  # Hostnames matching HTTP header.
+  hostnames:
+  - chart-example.local
+  # List of rules and filters applied.
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /headers
+  #   filters:
+  #   - type: RequestHeaderModifier
+  #     requestHeaderModifier:
+  #       set:
+  #       - name: My-Overwrite-Header
+  #         value: this-is-the-only-value
+  #       remove:
+  #       - User-Agent
+  # - matches:
+  #   - path:
+  #       type: PathPrefix
+  #       value: /echo
+  #     headers:
+  #     - name: version
+  #       value: v2
+
+# Required by admission policy 02-resources (P4).
+# AWS nodes are t4g.medium (2 vCPU / 4 Gi) shared by the whole platform: keep it small.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# Liveness = "is Apache alive?" -> static file served by Apache without Laravel or MySQL.
+# Never "/" here: a MySQL outage would make Kubernetes restart every app pod for nothing.
+livenessProbe:
+  httpGet:
+    path: /robots.txt
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+# Readiness = "can this pod serve users?" -> "/" reads the counter in MySQL.
+# Not ready = removed from the Service, no traffic sent to it (required by policy 05, P4).
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+# Spread the app replicas over different nodes: if a node goes down, the other replicas keep serving.
+# "required" = Kubernetes NEVER puts 2 app pods on the same node (a pod stays Pending rather than share a node).
+podAntiAffinity:
+  enabled: true
+
+# Custom affinity rules. If set, they replace the podAntiAffinity rule above.
+affinity: {}
+
+# Non-sensitive app settings, injected as environment variables (ConfigMap).
+# Passwords and keys go in a Secret, never here.
+config:
+  APP_ENV: production
+  APP_DEBUG: false
+  DB_CONNECTION: mysql
+  # MySQL Service created by the Bitnami subchart: <release>-mysql
+  DB_HOST: "{{ .Release.Name }}-mysql"
+  DB_PORT: 3306
+  DB_DATABASE: app_database
+  # Send Laravel logs to stderr so Kubernetes (and Loki) can read them
+  LOG_CHANNEL: stderr
+
+# Secret created outside the chart (kubectl now, SealedSecret later): never in Git
+existingSecret: kubequest-app-secrets
+
+# ---------------------------------------------------------------
+# MySQL database (official Bitnami chart, see Chart.yaml dependencies)
+# ---------------------------------------------------------------
+mysql:
+  enabled: true
+  architecture: standalone
+  # Required by our admission policy (04-labels)
+  commonLabels:
+    app.kubernetes.io/part-of: kubequest
+  image:
+    # Bitnami images moved to "bitnamilegacy" (multi-arch amd64/arm64)
+    # TODO: mirror to GHCR before AWS (policy 03-allowed-images)
+    registry: docker.io
+    repository: bitnamilegacy/mysql
+    tag: 8.0.37-debian-12-r2
+  auth:
+    # Must match DB_DATABASE (ConfigMap) and DB_USERNAME (app Secret)
+    database: app_database
+    username: app_user
+    # Keys: mysql-root-password, mysql-password, mysql-replication-password
+    existingSecret: kubequest-mysql-secrets
+  primary:
+    # AWS nodes are t4g.medium (2 vCPU / 4 Gi): ~8-9 Gi usable for the whole cluster
+    resources:
+      requests:
+        cpu: 100m
+        memory: 384Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+    # Default MySQL 8.0 performance_schema alone uses ~400 Mi: disabled to fit the limit
+    extraFlags: "--performance-schema=OFF"
+    persistence:
+      enabled: true
+      # Empty = default StorageClass (local-path on k3d). P4 sets the EFS one on AWS.
+      # EFS note for P4: Bitnami MySQL runs as uid/gid 1001 (access point must allow it)
+      storageClass: ""
+      size: 2Gi

@@ -1,0 +1,32 @@
+# Deployment conforme aux 5 règles : doit être ACCEPTÉ.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-test-ok
+  namespace: kubequest-app
+  labels: &labels
+    app.kubernetes.io/name: policy-test
+    app.kubernetes.io/instance: policy-test-ok
+    app.kubernetes.io/part-of: kubequest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: policy-test-ok
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: app
+          image: ghcr.io/epitechmscpropromo2027/t-clo-901-nce-9-1-kube-4/kubequest-app:0.1.0
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /, port: 8080 }

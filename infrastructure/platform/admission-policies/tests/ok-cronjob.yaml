@@ -1,0 +1,33 @@
+# CronJob conforme SANS readinessProbe (règle 5 ne s'applique pas aux jobs) : doit être ACCEPTÉ.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: policy-test-cron
+  namespace: kubequest-app
+  labels: &labels
+    app.kubernetes.io/name: policy-test
+    app.kubernetes.io/instance: policy-test-cron
+    app.kubernetes.io/part-of: kubequest
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    metadata:
+      labels: *labels
+    spec:
+      template:
+        metadata:
+          labels: *labels
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+          containers:
+            - name: backup
+              image: ghcr.io/epitechmscpropromo2027/t-clo-901-nce-9-1-kube-4/mysql:8.0.40
+              command: ["true"]
+              securityContext:
+                allowPrivilegeEscalation: false
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 200m, memory: 128Mi }

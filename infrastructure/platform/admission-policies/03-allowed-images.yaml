@@ -1,0 +1,69 @@
+# Règle 3 : images uniquement depuis notre registry privé, avec un tag explicite (jamais "latest").
+# Pour changer d'emplacement de registry, modifier uniquement la variable "allowedPrefix".
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: kubequest-allowed-images
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs", "cronjobs"]
+  variables:
+    - name: allowedPrefix
+      expression: "'ghcr.io/epitechmscpropromo2027/t-clo-901-nce-9-1-kube-4/'"
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        (object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec)
+    - name: containers
+      expression: >-
+        variables.podSpec.containers +
+        (has(variables.podSpec.initContainers) ? variables.podSpec.initContainers : [])
+    - name: badRegistry
+      expression: "variables.containers.filter(c, !c.image.startsWith(variables.allowedPrefix))"
+    # Un tag est la partie après ":" dans le dernier segment (après le dernier "/").
+    # Un digest (@sha256:...) est accepté à la place d'un tag.
+    - name: badTag
+      expression: >-
+        variables.containers.filter(c,
+          !c.image.contains('@sha256:') &&
+          (!c.image.substring(c.image.lastIndexOf('/')).contains(':') || c.image.endsWith(':latest')))
+  validations:
+    - expression: "size(variables.badRegistry) == 0"
+      messageExpression: >-
+        'Images autorisées uniquement depuis ' + variables.allowedPrefix + ' . Images refusées : ' +
+        variables.badRegistry.map(c, c.image).join(', ')
+    - expression: "size(variables.badTag) == 0"
+      messageExpression: >-
+        'Tag explicite obligatoire et "latest" interdit. Images refusées : ' +
+        variables.badTag.map(c, c.image).join(', ')
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: kubequest-allowed-images
+  labels:
+    app.kubernetes.io/name: admission-policies
+    app.kubernetes.io/part-of: kubequest
+spec:
+  policyName: kubequest-allowed-images
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kubequest-app

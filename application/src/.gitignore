@@ -1,0 +1,21 @@
+# Secrets
+.env
+.env.backup
+.env.production
+auth.json
+
+# Dépendances (se réinstallent)
+/vendor
+/node_modules
+
+# Fichiers générés
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+
+# Caches et logs
+.phpunit.result.cache
+/.phpunit.cache
+npm-debug.log
+yarn-error.log
